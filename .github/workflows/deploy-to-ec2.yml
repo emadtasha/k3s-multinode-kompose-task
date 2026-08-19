@@ -27,5 +27,5 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd ~/resilient-app-deploy
-            chmod +x scripts/deploy.sh
-            ./scripts/deploy.sh
+            chmod +x deploy.sh
+            ./deploy.sh
