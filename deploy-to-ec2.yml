@@ -10,23 +10,22 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Copy repository to EC2
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.HOST_IP }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          source: "."
-          target: "~/resilient-app-deploy"
-
-      - name: Run deploy script on EC2
+      - name: Run deploy on EC2 (clone repo and execute)
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.HOST_IP }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            cd ~/resilient-app-deploy
+            set -e
+            rm -rf ~/resilient-app-deploy || true
+            echo "Cloning repository on EC2..."
+            if git clone --depth=1 https://github.com/emadtasha/k3s-multinode-kompose-task.git ~/resilient-app-deploy; then
+              echo "Cloned public repo"
+            else
+              echo "Public clone failed; attempting to use existing copy or scp fallback"
+            fi
+            cd ~/resilient-app-deploy || { echo "Directory missing" >&2; ls -la ~; exit 1; }
             echo "Deploy directory contents:"; ls -la
             if [ -f ./scripts/deploy.sh ]; then
               chmod +x ./scripts/deploy.sh
