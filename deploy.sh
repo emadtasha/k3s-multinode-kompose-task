@@ -22,14 +22,7 @@ if ! command -v docker &> /dev/null; then
   sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 fi
 
-# Ensure current user can run Docker without sudo
-if command -v docker &> /dev/null; then
-  if ! id -nG "$USER" | grep -qw docker; then
-    echo ">>> Adding $USER to the docker group to allow k3d to run without sudo..."
-    sudo usermod -aG docker "$USER" || true
-    echo ">>> Added $USER to docker group. You may need to log out and back in for this to take effect." 
-  fi
-fi
+# NOTE: Do not change group membership here — changes require a new login session.
 
 if ! command -v k3d &> /dev/null; then
   echo ">>> Installing k3d..."
@@ -44,20 +37,25 @@ if ! command -v kubectl &> /dev/null; then
 fi
 
 echo ">>> Ensuring cluster exists..."
-if ! k3d cluster list | grep -q "${CLUSTER_NAME}"; then
-  k3d cluster create "${CLUSTER_NAME}" -p "80:80@loadbalancer" -p "443:443@loadbalancer"
+if ! sudo k3d cluster list | grep -q "${CLUSTER_NAME}"; then
+  sudo k3d cluster create "${CLUSTER_NAME}" -p "80:80@loadbalancer" -p "443:443@loadbalancer"
 else
   echo ">>> Cluster already exists, skipping creation."
 fi
 
 echo ">>> Installing NGINX Ingress Controller..."
-k3d kubeconfig merge "${CLUSTER_NAME}" --kubeconfig-merge-default
+# Write root kubeconfig then copy to the regular user's kubeconfig so ownership matches
+sudo k3d kubeconfig get "${CLUSTER_NAME}" | sudo tee /root/.kube/config > /dev/null
+mkdir -p ~/.kube
+sudo k3d kubeconfig get "${CLUSTER_NAME}" > ~/.kube/config
+chmod 600 ~/.kube/config
 export KUBECONFIG=~/.kube/config
 
-# Verify kubectl can reach the cluster
+# Verify kubectl can reach the cluster and that nodes are present
 echo ">>> Verifying cluster access with 'kubectl get nodes'..."
-if ! kubectl get nodes --no-headers -o custom-columns=":metadata.name" | grep -q .; then
-  echo ">>> Error: kubectl cannot see any nodes. Aborting." >&2
+nodes_output=$(kubectl get nodes --no-headers 2>/dev/null || true)
+if [ -z "${nodes_output}" ]; then
+  echo ">>> Error: kubectl cannot see any nodes or cannot contact the cluster. Aborting." >&2
   kubectl cluster-info || true
   exit 1
 fi
