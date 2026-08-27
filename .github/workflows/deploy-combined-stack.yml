@@ -1,0 +1,31 @@
+name: Deploy Combined Stack (Helm/Traefik + Prometheus + Dashboard)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  copy-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Copy combined-stack folder to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.HOST_IP }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "combined-stack/*"
+          target: "~/combined-stack-deploy"
+
+      - name: Run deploy script on EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HOST_IP }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd ~/combined-stack-deploy
+            chmod +x deploy-all.sh
+            ./deploy-all.sh
