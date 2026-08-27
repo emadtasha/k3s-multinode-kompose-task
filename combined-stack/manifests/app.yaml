@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: app-dev
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metrics-emitter
+  namespace: app-dev
+  labels:
+    app: metrics-emitter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: metrics-emitter
+  template:
+    metadata:
+      labels:
+        app: metrics-emitter
+    spec:
+      containers:
+        - name: podinfo
+          image: stefanprodan/podinfo:latest
+          ports:
+            - containerPort: 9898
+              name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: metrics-emitter
+  namespace: app-dev
+  labels:
+    app: metrics-emitter
+spec:
+  selector:
+    app: metrics-emitter
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 9898
